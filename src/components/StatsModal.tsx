@@ -102,7 +102,9 @@ export const StatsModal: React.FC<StatsModalProps> = ({
                 <Cpu className="w-3.5 h-3.5 text-emerald-400" />
                 <span>Runtime Memory</span>
               </div>
-              <span className="font-mono text-emerald-400 font-semibold">&lt; 14.2 MB</span>
+              <span className="font-mono text-emerald-400 font-semibold">
+                {stats?.memory_rss_bytes ? formatBytes(stats.memory_rss_bytes) : "< 15 MB"}
+              </span>
             </div>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1.5 text-zinc-300">

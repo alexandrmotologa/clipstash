@@ -38,6 +38,11 @@ export const Header: React.FC<HeaderProps> = ({
   onToggleHud,
   stats,
 }) => {
+  const formatMemory = (bytes?: number) => {
+    if (!bytes || bytes === 0) return "< 15 MB RAM";
+    const mb = (bytes / (1024 * 1024)).toFixed(1);
+    return `${mb} MB RAM`;
+  };
   return (
     <header className="border-b border-zinc-800/80 bg-zinc-950/80 backdrop-blur-md px-4 py-3 select-none">
       <div className="flex items-center justify-between gap-4">
@@ -57,7 +62,7 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
             <div className="flex items-center gap-1.5 text-[11px] text-zinc-400">
               <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-              <span className="font-mono text-zinc-300">&lt;14.2 MB RAM</span>
+              <span className="font-mono text-zinc-300">{formatMemory(stats?.memory_rss_bytes)}</span>
             </div>
           </div>
         </div>

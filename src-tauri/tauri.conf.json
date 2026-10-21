@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "ClipStash — Smart Clipboard Vault & Transformation Studio",
+        "title": "ClipStash: Smart Clipboard Vault and Transformation Studio",
         "width": 1080,
         "height": 720,
         "minWidth": 880,

@@ -36,6 +36,7 @@ pub struct DatabaseStats {
     pub pinned_clips: i64,
     pub total_purged: i64,
     pub db_size_bytes: u64,
+    pub memory_rss_bytes: u64,
 }
 
 #[derive(Clone)]
@@ -454,6 +455,49 @@ impl Database {
         Ok(ids)
     }
 
+#[cfg(target_os = "windows")]
+fn get_current_process_memory() -> u64 {
+    use std::mem::size_of;
+    #[repr(C)]
+    struct ProcessMemoryCounters {
+        cb: u32,
+        page_fault_count: u32,
+        peak_working_set_size: usize,
+        working_set_size: usize,
+        quota_peak_paged_pool_usage: usize,
+        quota_paged_pool_usage: usize,
+        quota_peak_non_paged_pool_usage: usize,
+        quota_non_paged_pool_usage: usize,
+        pagefile_usage: usize,
+        peak_pagefile_usage: usize,
+    }
+
+    #[link(name = "psapi")]
+    unsafe extern "system" {
+        fn GetCurrentProcess() -> *mut std::ffi::c_void;
+        fn GetProcessMemoryInfo(
+            hProcess: *mut std::ffi::c_void,
+            ppsmc: *mut ProcessMemoryCounters,
+            cb: u32,
+        ) -> i32;
+    }
+
+    unsafe {
+        let mut pmc: ProcessMemoryCounters = std::mem::zeroed();
+        pmc.cb = size_of::<ProcessMemoryCounters>() as u32;
+        let handle = GetCurrentProcess();
+        if GetProcessMemoryInfo(handle, &mut pmc, pmc.cb) != 0 {
+            return pmc.working_set_size as u64;
+        }
+        0
+    }
+}
+
+#[cfg(not(target_os = "windows"))]
+fn get_current_process_memory() -> u64 {
+    0
+}
+
     pub fn get_stats(&self) -> Result<DatabaseStats, String> {
         let conn = self.conn.lock().map_err(|e| e.to_string())?;
 
@@ -491,12 +535,15 @@ impl Database {
             0
         };
 
+        let memory_rss_bytes = Self::get_current_process_memory();
+
         Ok(DatabaseStats {
             total_clips,
             secret_clips,
             pinned_clips,
             total_purged,
             db_size_bytes,
+            memory_rss_bytes,
         })
     }
 

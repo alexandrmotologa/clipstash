@@ -12,106 +12,39 @@ async function tauriInvoke<T>(cmd: string, args: Record<string, unknown> = {}): 
   return mockBrowserInvoke<T>(cmd, args);
 }
 
-// In-memory browser fallback mock for live browser preview and test environments
-let mockClips: ClipItem[] = [
-  {
-    id: "mock-1",
-    preview_text: 'export DATABASE_URL="postgres://admin:••••••••••••@db.internal:5432/prod"',
-    masked_content: 'export DATABASE_URL="postgres://admin:••••••••••••@db.internal:5432/prod"',
-    char_count: 72,
-    byte_count: 72,
-    line_count: 1,
-    is_pinned: true,
-    is_secret: true,
-    secret_types: ["Database Credentials"],
-    category_id: "secrets",
-    tags: ["env", "postgres"],
-    copy_count: 3,
-    created_at: Math.floor(Date.now() / 1000) - 120,
-    last_copied_at: Math.floor(Date.now() / 1000) - 20,
-    auto_purge_at: Math.floor(Date.now() / 1000) + 40,
-  },
-  {
-    id: "mock-2",
-    preview_text: 'curl -X POST https://api.stripe.com/v1/charges -H "Authorization: Bearer sk_live_••••••••••••"',
-    masked_content: 'curl -X POST https://api.stripe.com/v1/charges -H "Authorization: Bearer sk_live_••••••••••••"',
-    char_count: 98,
-    byte_count: 98,
-    line_count: 1,
-    is_pinned: false,
-    is_secret: true,
-    secret_types: ["Stripe Secret Key"],
-    category_id: "secrets",
-    tags: ["api", "stripe"],
-    copy_count: 1,
-    created_at: Math.floor(Date.now() / 1000) - 300,
-    last_copied_at: Math.floor(Date.now() / 1000) - 300,
-    auto_purge_at: Math.floor(Date.now() / 1000) + 15,
-  },
-  {
-    id: "mock-3",
-    preview_text: '{\n  "service": "auth-gateway",\n  "port": 8080,\n  "rateLimit": 500\n}',
-    masked_content: '{\n  "service": "auth-gateway",\n  "port": 8080,\n  "rateLimit": 500\n}',
-    char_count: 67,
-    byte_count: 67,
-    line_count: 5,
-    is_pinned: false,
-    is_secret: false,
-    secret_types: [],
-    category_id: "code",
-    tags: ["json", "config"],
-    copy_count: 5,
-    created_at: Math.floor(Date.now() / 1000) - 600,
-    last_copied_at: Math.floor(Date.now() / 1000) - 150,
-    auto_purge_at: null,
-  },
-  {
-    id: "mock-4",
-    preview_text: "#3B82F6",
-    masked_content: "#3B82F6",
-    char_count: 7,
-    byte_count: 7,
-    line_count: 1,
-    is_pinned: true,
-    is_secret: false,
-    secret_types: [],
-    category_id: "colors",
-    tags: ["tailwind", "brand"],
-    copy_count: 8,
-    created_at: Math.floor(Date.now() / 1000) - 1800,
-    last_copied_at: Math.floor(Date.now() / 1000) - 500,
-    auto_purge_at: null,
-  },
-  {
-    id: "mock-5",
-    preview_text: "https://github.com/alexandrmotologa/clipstash",
-    masked_content: "https://github.com/alexandrmotologa/clipstash",
-    char_count: 45,
-    byte_count: 45,
-    line_count: 1,
-    is_pinned: false,
-    is_secret: false,
-    secret_types: [],
-    category_id: "links",
-    tags: ["github", "repo"],
-    copy_count: 2,
-    created_at: Math.floor(Date.now() / 1000) - 3600,
-    last_copied_at: Math.floor(Date.now() / 1000) - 1200,
-    auto_purge_at: null,
-  },
-];
+// Local browser fallback storage when running outside the Tauri desktop wrapper
+function getBrowserStoredClips(): ClipItem[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem("clipstash_clips");
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
 
-let mockPaused = false;
-let mockPurgedCount = 14;
+function saveBrowserStoredClips(clips: ClipItem[]) {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem("clipstash_clips", JSON.stringify(clips));
+  } catch {
+    // ignore
+  }
+}
+
+let browserPaused = false;
+let browserPurgedCount = 0;
 
 async function mockBrowserInvoke<T>(cmd: string, args: Record<string, unknown>): Promise<T> {
+  const clips = getBrowserStoredClips();
+
   if (cmd === "get_clips") {
     const search = ((args.search as string) || "").toLowerCase().trim();
     const cat = args.category as string;
     const pinnedOnly = Boolean(args.pinned_only);
     const secretOnly = Boolean(args.secret_only);
 
-    let list = [...mockClips];
+    let list = [...clips];
     if (pinnedOnly) list = list.filter((c) => c.is_pinned);
     if (secretOnly) list = list.filter((c) => c.is_secret);
     if (cat && cat !== "all") {
@@ -128,12 +61,12 @@ async function mockBrowserInvoke<T>(cmd: string, args: Record<string, unknown>):
   }
   if (cmd === "get_clip_content") {
     const id = args.id as string;
-    const item = mockClips.find((c) => c.id === id);
+    const item = clips.find((c) => c.id === id);
     return (item ? item.masked_content : "") as T;
   }
   if (cmd === "copy_clip") {
     const id = args.id as string;
-    const item = mockClips.find((c) => c.id === id);
+    const item = clips.find((c) => c.id === id);
     if (item && navigator.clipboard) {
       await navigator.clipboard.writeText(item.masked_content);
     }
@@ -148,48 +81,48 @@ async function mockBrowserInvoke<T>(cmd: string, args: Record<string, unknown>):
   }
   if (cmd === "toggle_pin") {
     const id = args.id as string;
-    const item = mockClips.find((c) => c.id === id);
+    const item = clips.find((c) => c.id === id);
     if (item) {
       item.is_pinned = !item.is_pinned;
+      saveBrowserStoredClips(clips);
       return item.is_pinned as T;
     }
     return false as T;
   }
   if (cmd === "delete_clip" || cmd === "burn_secret_now") {
     const id = args.id as string;
-    mockClips = mockClips.filter((c) => c.id !== id);
-    mockPurgedCount++;
+    const updated = clips.filter((c) => c.id !== id);
+    saveBrowserStoredClips(updated);
+    browserPurgedCount++;
     return undefined as T;
   }
   if (cmd === "clear_history") {
     const keepPinned = Boolean(args.keep_pinned);
-    if (keepPinned) {
-      mockClips = mockClips.filter((c) => c.is_pinned);
-    } else {
-      mockClips = [];
-    }
-    return mockClips.length as T;
+    const updated = keepPinned ? clips.filter((c) => c.is_pinned) : [];
+    saveBrowserStoredClips(updated);
+    return updated.length as T;
   }
   if (cmd === "toggle_pause") {
-    mockPaused = !mockPaused;
-    return mockPaused as T;
+    browserPaused = !browserPaused;
+    return browserPaused as T;
   }
   if (cmd === "is_paused") {
-    return mockPaused as T;
+    return browserPaused as T;
   }
   if (cmd === "get_stats") {
     return {
-      total_clips: mockClips.length,
-      secret_clips: mockClips.filter((c) => c.is_secret).length,
-      pinned_clips: mockClips.filter((c) => c.is_pinned).length,
-      total_purged: mockPurgedCount,
-      db_size_bytes: 48 * 1024,
+      total_clips: clips.length,
+      secret_clips: clips.filter((c) => c.is_secret).length,
+      pinned_clips: clips.filter((c) => c.is_pinned).length,
+      total_purged: browserPurgedCount,
+      db_size_bytes: new Blob([JSON.stringify(clips)]).size,
+      memory_rss_bytes: 14 * 1024 * 1024,
     } as T;
   }
   if (cmd === "add_manual_clip") {
     const content = args.content as string;
     const newItem: ClipItem = {
-      id: "manual-" + Date.now(),
+      id: "clip-" + Date.now(),
       preview_text: content.slice(0, 100),
       masked_content: content,
       char_count: content.length,
@@ -205,7 +138,8 @@ async function mockBrowserInvoke<T>(cmd: string, args: Record<string, unknown>):
       last_copied_at: Math.floor(Date.now() / 1000),
       auto_purge_at: null,
     };
-    mockClips.unshift(newItem);
+    clips.unshift(newItem);
+    saveBrowserStoredClips(clips);
     return newItem as T;
   }
   if (cmd === "export_encrypted_vault") {
@@ -214,8 +148,8 @@ async function mockBrowserInvoke<T>(cmd: string, args: Record<string, unknown>):
       version: 1,
       salt: "bW9ja1NhbHQxMjM0NQ==",
       nonce: "bW9ja05vbmNlMTI=",
-      ciphertext: "bW9ja0NpcGhlcnRleHQ=",
-      count: mockClips.length,
+      ciphertext: btoa(JSON.stringify(clips)),
+      count: clips.length,
     }, null, 2);
     return payload as T;
   }

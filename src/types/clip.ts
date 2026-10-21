@@ -22,6 +22,7 @@ export interface DatabaseStats {
   pinned_clips: number;
   total_purged: number;
   db_size_bytes: number;
+  memory_rss_bytes?: number;
 }
 
 export type CategoryFilter =
