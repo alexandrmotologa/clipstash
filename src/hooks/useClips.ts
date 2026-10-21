@@ -13,13 +13,132 @@ async function tauriInvoke<T>(cmd: string, args: Record<string, unknown> = {}): 
 }
 
 // Local browser fallback storage when running outside the Tauri desktop wrapper
+const DEFAULT_BROWSER_CLIPS: ClipItem[] = [
+  {
+    id: "clip-db-url",
+    preview_text: 'export DATABASE_URL="postgres://postgres:••••••••••••@aws-0-eu-central-1.pooler.supabase.com:6543/postgres"',
+    masked_content: 'export DATABASE_URL="postgres://postgres:••••••••••••@aws-0-eu-central-1.pooler.supabase.com:6543/postgres"',
+    char_count: 104,
+    byte_count: 104,
+    line_count: 1,
+    is_pinned: true,
+    is_secret: true,
+    secret_types: ["Database Credentials"],
+    category_id: "secrets",
+    tags: ["env", "postgres", "supabase"],
+    copy_count: 8,
+    created_at: Math.floor(Date.now() / 1000) - 300,
+    last_copied_at: Math.floor(Date.now() / 1000) - 45,
+    auto_purge_at: Math.floor(Date.now() / 1000) + 45,
+  },
+  {
+    id: "clip-stripe-curl",
+    preview_text: 'curl -X POST https://api.stripe.com/v1/payment_intents -H "Authorization: Bearer sk_test_••••••••••••••••••••••••" -d amount=4999 -d currency=usd',
+    masked_content: 'curl -X POST https://api.stripe.com/v1/payment_intents -H "Authorization: Bearer sk_test_••••••••••••••••••••••••" -d amount=4999 -d currency=usd',
+    char_count: 147,
+    byte_count: 147,
+    line_count: 1,
+    is_pinned: true,
+    is_secret: true,
+    secret_types: ["Stripe Secret Key"],
+    category_id: "secrets",
+    tags: ["api", "stripe", "curl"],
+    copy_count: 4,
+    created_at: Math.floor(Date.now() / 1000) - 600,
+    last_copied_at: Math.floor(Date.now() / 1000) - 120,
+    auto_purge_at: Math.floor(Date.now() / 1000) + 30,
+  },
+  {
+    id: "clip-json-gateway",
+    preview_text: '{\n  "service": "auth-gateway",\n  "version": "2.4.0",\n  "port": 8080,\n  "rateLimit": 500,\n  "tls": true,\n  "cors": ["https://app.clipstash.dev"]\n}',
+    masked_content: '{\n  "service": "auth-gateway",\n  "version": "2.4.0",\n  "port": 8080,\n  "rateLimit": 500,\n  "tls": true,\n  "cors": ["https://app.clipstash.dev"]\n}',
+    char_count: 154,
+    byte_count: 154,
+    line_count: 8,
+    is_pinned: false,
+    is_secret: false,
+    secret_types: [],
+    category_id: "code",
+    tags: ["json", "config", "gateway"],
+    copy_count: 14,
+    created_at: Math.floor(Date.now() / 1000) - 1200,
+    last_copied_at: Math.floor(Date.now() / 1000) - 240,
+    auto_purge_at: null,
+  },
+  {
+    id: "clip-sql-query",
+    preview_text: "SELECT id, email, created_at, role FROM users WHERE status = 'active' ORDER BY created_at DESC LIMIT 50;",
+    masked_content: "SELECT id, email, created_at, role FROM users WHERE status = 'active' ORDER BY created_at DESC LIMIT 50;",
+    char_count: 104,
+    byte_count: 104,
+    line_count: 1,
+    is_pinned: false,
+    is_secret: false,
+    secret_types: [],
+    category_id: "code",
+    tags: ["sql", "postgres"],
+    copy_count: 6,
+    created_at: Math.floor(Date.now() / 1000) - 2400,
+    last_copied_at: Math.floor(Date.now() / 1000) - 300,
+    auto_purge_at: null,
+  },
+  {
+    id: "clip-hex-brand",
+    preview_text: "#6366f1",
+    masked_content: "#6366f1",
+    char_count: 7,
+    byte_count: 7,
+    line_count: 1,
+    is_pinned: false,
+    is_secret: false,
+    secret_types: [],
+    category_id: "colors",
+    tags: ["color", "indigo", "brand"],
+    copy_count: 9,
+    created_at: Math.floor(Date.now() / 1000) - 3600,
+    last_copied_at: Math.floor(Date.now() / 1000) - 600,
+    auto_purge_at: null,
+  },
+  {
+    id: "clip-github-repo",
+    preview_text: "https://github.com/alexandrmotologa/clipstash",
+    masked_content: "https://github.com/alexandrmotologa/clipstash",
+    char_count: 44,
+    byte_count: 44,
+    line_count: 1,
+    is_pinned: false,
+    is_secret: false,
+    secret_types: [],
+    category_id: "links",
+    tags: ["github", "repo", "rust"],
+    copy_count: 12,
+    created_at: Math.floor(Date.now() / 1000) - 7200,
+    last_copied_at: Math.floor(Date.now() / 1000) - 1800,
+    auto_purge_at: null,
+  }
+];
+
+const BROWSER_UNMASKED_SECRETS: Record<string, string> = {
+  "clip-db-url": 'export DATABASE_URL="postgres://postgres:s3cur3_p4ssw0rd!@aws-0-eu-central-1.pooler.supabase.com:6543/postgres"',
+  "clip-stripe-curl": 'curl -X POST https://api.stripe.com/v1/payment_intents -H "Authorization: Bearer sk_test_mock_secret_key_clipstash_demo" -d amount=4999 -d currency=usd',
+};
+
 function getBrowserStoredClips(): ClipItem[] {
-  if (typeof window === "undefined") return [];
+  if (typeof window === "undefined") return DEFAULT_BROWSER_CLIPS;
   try {
     const raw = localStorage.getItem("clipstash_clips");
-    return raw ? JSON.parse(raw) : [];
+    if (!raw) {
+      localStorage.setItem("clipstash_clips", JSON.stringify(DEFAULT_BROWSER_CLIPS));
+      return DEFAULT_BROWSER_CLIPS;
+    }
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed) || parsed.length === 0) {
+      localStorage.setItem("clipstash_clips", JSON.stringify(DEFAULT_BROWSER_CLIPS));
+      return DEFAULT_BROWSER_CLIPS;
+    }
+    return parsed;
   } catch {
-    return [];
+    return DEFAULT_BROWSER_CLIPS;
   }
 }
 
@@ -61,6 +180,9 @@ async function mockBrowserInvoke<T>(cmd: string, args: Record<string, unknown>):
   }
   if (cmd === "get_clip_content") {
     const id = args.id as string;
+    if (BROWSER_UNMASKED_SECRETS[id]) {
+      return BROWSER_UNMASKED_SECRETS[id] as T;
+    }
     const item = clips.find((c) => c.id === id);
     return (item ? item.masked_content : "") as T;
   }

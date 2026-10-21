@@ -106,6 +106,20 @@ Tokens and sensitive variables are masked upon arrival. Users can reveal the ori
   <img src="docs/images/clipstash_vault_masking.png" alt="ClipStash Secret Vault Masking" width="900" />
 </p>
 
+### Side-by-Side Diff Inspector
+Compare any two clipboard snippets side by side with colored line additions and deletions, or generate unified Git patches with a single click.
+
+<p align="center">
+  <img src="docs/images/clipstash_diff.png" alt="ClipStash Side-by-Side Diff Inspector" width="900" />
+</p>
+
+### Quick HUD Palette Mode
+Floating command palette accessible with Tab or header shortcut, binding the top 9 clipboard records directly to number keys 1 through 9 for rapid copying without mouse interaction.
+
+<p align="center">
+  <img src="docs/images/clipstash_hud.png" alt="ClipStash Quick HUD Mode" width="900" />
+</p>
+
 ### Performance and Telemetry
 Benchmarks demonstrate the contrast between ClipStash and conventional Electron clipboard utilities.
 

@@ -23,6 +23,8 @@ interface HeaderProps {
   onClearHistory: () => void;
   onOpenDiff?: () => void;
   onToggleHud?: () => void;
+  mobileView?: "clips" | "studio";
+  onSelectMobileView?: (view: "clips" | "studio") => void;
   stats: DatabaseStats | null;
 }
 
@@ -36,6 +38,8 @@ export const Header: React.FC<HeaderProps> = ({
   onClearHistory,
   onOpenDiff,
   onToggleHud,
+  mobileView,
+  onSelectMobileView,
   stats,
 }) => {
   const formatMemory = (bytes?: number) => {
@@ -47,7 +51,7 @@ export const Header: React.FC<HeaderProps> = ({
     <header className="border-b border-zinc-800/80 bg-zinc-950/80 backdrop-blur-md px-4 py-3 select-none">
       <div className="flex items-center justify-between gap-4">
         {/* Brand & App identity */}
-        <div className="flex items-center gap-2.5 min-w-[200px]">
+        <div className="flex items-center gap-2 flex-shrink-0">
           <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-emerald-500 p-0.5 flex items-center justify-center shadow-lg shadow-indigo-500/20">
             <div className="w-full h-full bg-zinc-950 rounded-[7px] flex items-center justify-center">
               <span className="text-emerald-400 font-black text-sm tracking-tight">CS</span>
@@ -56,16 +60,42 @@ export const Header: React.FC<HeaderProps> = ({
           <div>
             <div className="flex items-center gap-1.5">
               <h1 className="text-sm font-semibold tracking-wide text-zinc-100">ClipStash</h1>
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 font-mono">
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 font-mono hidden sm:inline-block">
                 v1.0
               </span>
             </div>
-            <div className="flex items-center gap-1.5 text-[11px] text-zinc-400">
+            <div className="flex items-center gap-1.5 text-[11px] text-zinc-400 hidden sm:flex">
               <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
               <span className="font-mono text-zinc-300">{formatMemory(stats?.memory_rss_bytes)}</span>
             </div>
           </div>
         </div>
+
+        {/* Mobile View Switcher (Visible only on < md screens) */}
+        {onSelectMobileView && (
+          <div className="flex md:hidden items-center bg-zinc-900 border border-zinc-800 p-0.5 rounded-lg text-xs">
+            <button
+              onClick={() => onSelectMobileView("clips")}
+              className={`px-2 py-1 rounded font-medium transition-colors ${
+                mobileView === "clips"
+                  ? "bg-indigo-600 text-white shadow-sm"
+                  : "text-zinc-400 hover:text-zinc-200"
+              }`}
+            >
+              Clips ({stats?.total_clips ?? 0})
+            </button>
+            <button
+              onClick={() => onSelectMobileView("studio")}
+              className={`px-2 py-1 rounded font-medium transition-colors ${
+                mobileView === "studio"
+                  ? "bg-indigo-600 text-white shadow-sm"
+                  : "text-zinc-400 hover:text-zinc-200"
+              }`}
+            >
+              Studio
+            </button>
+          </div>
+        )}
 
         {/* Global Search Bar */}
         <div className="relative flex-1 max-w-xl">

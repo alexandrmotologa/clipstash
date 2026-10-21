@@ -50,6 +50,7 @@ export function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isDiffOpen, setIsDiffOpen] = useState(false);
   const [isHudOpen, setIsHudOpen] = useState(false);
+  const [mobileView, setMobileView] = useState<"clips" | "studio">("clips");
 
   // Global shortcut listeners (Shift+Enter for queue pop, Tab for HUD toggle)
   useEffect(() => {
@@ -81,6 +82,7 @@ export function App() {
     setSelectedClip(clip);
     const idx = clips.findIndex((c) => c.id === clip.id);
     if (idx !== -1) setSelectedIndex(idx);
+    setMobileView("studio");
   };
 
   const handleSaveAsNewClip = async (text: string) => {
@@ -101,13 +103,15 @@ export function App() {
         onOpenDiff={() => setIsDiffOpen(true)}
         onToggleHud={() => setIsHudOpen((v) => !v)}
         onClearHistory={() => clearHistory(true)}
+        mobileView={mobileView}
+        onSelectMobileView={setMobileView}
         stats={stats}
       />
 
       {/* Main Dual-Pane Workspace */}
       <div className="flex-1 flex min-h-0 overflow-hidden">
         {/* Left Side: Category Filters + Clip List */}
-        <div className="w-1/2 md:w-[48%] lg:w-[42%] flex flex-col border-r border-zinc-800/80 bg-zinc-950/40">
+        <div className={`w-full md:w-[48%] lg:w-[42%] flex-col border-r border-zinc-800/80 bg-zinc-950/40 ${mobileView === "clips" ? "flex" : "hidden md:flex"}`}>
           <CategoryTabs
             activeCategory={activeCategory}
             onSelectCategory={setActiveCategory}
@@ -179,13 +183,14 @@ export function App() {
         </div>
 
         {/* Right Side: Developer Transformation Studio */}
-        <div className="flex-1 flex flex-col min-w-0 bg-zinc-950/80">
+        <div className={`flex-1 flex-col min-w-0 bg-zinc-950/80 ${mobileView === "studio" ? "flex" : "hidden md:flex"}`}>
           <StudioDrawer
             clip={selectedClip}
             revealedText={selectedClip ? revealedSecrets[selectedClip.id] : undefined}
             onCopyCustom={copyCustomText}
             onSaveAsNewClip={handleSaveAsNewClip}
             onBurnSecret={burnSecretNow}
+            onBackToClips={() => setMobileView("clips")}
           />
         </div>
       </div>

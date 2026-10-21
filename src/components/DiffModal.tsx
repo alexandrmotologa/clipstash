@@ -198,7 +198,7 @@ export const DiffModal: React.FC<DiffModalProps> = ({
               })}
             </div>
           ) : (
-            <div className="grid grid-cols-2 gap-4 h-full">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-full">
               {/* Left Pane (Base A) */}
               <div className="flex flex-col border border-zinc-800/80 rounded-lg overflow-hidden bg-zinc-950/60">
                 <div className="px-3 py-1.5 bg-zinc-900/80 border-b border-zinc-800 text-[11px] font-semibold text-rose-400 flex items-center justify-between">

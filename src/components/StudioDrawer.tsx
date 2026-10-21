@@ -12,6 +12,7 @@ import {
   Type,
   Binary,
   ArrowRight,
+  ArrowLeft,
   Flame,
   CheckCircle2,
   AlertCircle,
@@ -61,6 +62,7 @@ interface StudioDrawerProps {
   onCopyCustom: (text: string) => void;
   onSaveAsNewClip: (text: string) => void;
   onBurnSecret: (id: string) => void;
+  onBackToClips?: () => void;
   onClose?: () => void;
 }
 
@@ -72,6 +74,7 @@ export const StudioDrawer: React.FC<StudioDrawerProps> = ({
   onCopyCustom,
   onSaveAsNewClip,
   onBurnSecret,
+  onBackToClips,
 }) => {
   const [activeTab, setActiveTab] = useState<StudioTab>("json");
   const [activeAction, setActiveAction] = useState<string>("");
@@ -325,6 +328,15 @@ export const StudioDrawer: React.FC<StudioDrawerProps> = ({
       {/* Studio Header */}
       <div className="px-4 py-3 border-b border-zinc-800/60 flex items-center justify-between">
         <div className="flex items-center gap-2">
+          {onBackToClips && (
+            <button
+              onClick={onBackToClips}
+              className="md:hidden flex items-center gap-1 text-xs text-indigo-400 hover:text-indigo-300 font-medium py-1 px-2 rounded bg-zinc-900 border border-zinc-800 transition-colors"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span>Clips</span>
+            </button>
+          )}
           <Wand2 className="w-4 h-4 text-sky-400" />
           <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-300">
             Developer Studio
