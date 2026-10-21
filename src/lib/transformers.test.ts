@@ -27,6 +27,11 @@ import {
   countTextStats,
   sortLines,
   removeDuplicateLines,
+  jsonToGoStruct,
+  jsonToRustStruct,
+  convertTimestamp,
+  formatSql,
+  htmlToMarkdown,
 } from "./transformers";
 
 describe("Developer Transformers", () => {
@@ -187,6 +192,81 @@ describe("Developer Transformers", () => {
       expect(stats.words).toBe(9);
       expect(stats.chars).toBe(43);
       expect(stats.tokensEst).toBe(11);
+    });
+  });
+
+  describe("Extended Language Struct Generators", () => {
+    const sampleJson = JSON.stringify({
+      id: 101,
+      user_name: "alex",
+      is_admin: true,
+      tags: ["dev", "rust"],
+      profile: { bio: "engineer" },
+    });
+
+    it("generates Go struct from JSON", () => {
+      const go = jsonToGoStruct(sampleJson, "UserProfile");
+      expect(go.success).toBe(true);
+      expect(go.result).toContain("type UserProfile struct");
+      expect(go.result).toContain("Id int64 `json:\"id\"`");
+      expect(go.result).toContain("UserName string `json:\"user_name\"`");
+      expect(go.result).toContain("IsAdmin bool `json:\"is_admin\"`");
+      expect(go.result).toContain("type Profile struct");
+    });
+
+    it("generates Rust struct from JSON with Serde attributes", () => {
+      const rust = jsonToRustStruct(sampleJson, "UserProfile");
+      expect(rust.success).toBe(true);
+      expect(rust.result).toContain("#[derive(Debug, Clone, Serialize, Deserialize)]");
+      expect(rust.result).toContain("pub struct UserProfile");
+      expect(rust.result).toContain("pub id: i64,");
+      expect(rust.result).toContain("pub is_admin: bool,");
+      expect(rust.result).toContain("pub struct Profile");
+    });
+  });
+
+  describe("Timestamp & Epoch Converter", () => {
+    it("converts unix seconds and milliseconds", () => {
+      const resSec = convertTimestamp("1700000000");
+      expect(resSec.success).toBe(true);
+      expect(resSec.result).toContain("Unix Timestamp (Seconds):      1700000000");
+      expect(resSec.result).toContain("ISO 8601 (UTC):                2023-11-14T22:13:20.000Z");
+
+      const resMs = convertTimestamp("1700000000000");
+      expect(resMs.success).toBe(true);
+      expect(resMs.result).toContain("Unix Timestamp (Milliseconds): 1700000000000");
+    });
+
+    it("converts ISO date string to timestamps", () => {
+      const res = convertTimestamp("2024-01-01T00:00:00.000Z");
+      expect(res.success).toBe(true);
+      expect(res.result).toContain("Unix Timestamp (Seconds):      1704067200");
+    });
+  });
+
+  describe("SQL Formatter", () => {
+    it("formats and indents SQL query with uppercase keywords", () => {
+      const query = "select id, name from users where active = 1 and age > 18 order by id desc limit 10";
+      const formatted = formatSql(query);
+      expect(formatted.success).toBe(true);
+      expect(formatted.result).toContain("SELECT");
+      expect(formatted.result).toContain("FROM");
+      expect(formatted.result).toContain("WHERE");
+      expect(formatted.result).toContain("ORDER BY");
+      expect(formatted.result).toContain("LIMIT");
+    });
+  });
+
+  describe("HTML to Markdown Converter", () => {
+    it("converts headings, links, bold, code, and lists", () => {
+      const html = "<h1>Title</h1><p>Check <strong>bold</strong> and <a href='https://example.com'>link</a></p><ul><li>One</li><li>Two</li></ul>";
+      const md = htmlToMarkdown(html);
+      expect(md.success).toBe(true);
+      expect(md.result).toContain("# Title");
+      expect(md.result).toContain("**bold**");
+      expect(md.result).toContain("[link](https://example.com)");
+      expect(md.result).toContain("- One");
+      expect(md.result).toContain("- Two");
     });
   });
 });

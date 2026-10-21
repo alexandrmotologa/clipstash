@@ -47,6 +47,11 @@ import {
   extractIpv4,
   extractUuids,
   countTextStats,
+  jsonToGoStruct,
+  jsonToRustStruct,
+  convertTimestamp,
+  formatSql,
+  htmlToMarkdown,
 } from "../lib/transformers";
 import { sounds } from "../lib/audio";
 
@@ -130,6 +135,18 @@ export const StudioDrawer: React.FC<StudioDrawerProps> = ({
         else setErrorMsg(res.error || "Failed to convert to YAML");
         break;
       }
+      case "json-go": {
+        const res = jsonToGoStruct(input, "Payload");
+        if (res.success) setOutputText(res.result);
+        else setErrorMsg(res.error || "Failed to generate Go struct");
+        break;
+      }
+      case "json-rust": {
+        const res = jsonToRustStruct(input, "Payload");
+        if (res.success) setOutputText(res.result);
+        else setErrorMsg(res.error || "Failed to generate Rust struct");
+        break;
+      }
 
       // cURL Actions
       case "curl-fetch": {
@@ -177,6 +194,12 @@ export const StudioDrawer: React.FC<StudioDrawerProps> = ({
         const res = hexDecode(input);
         if (res.success) setOutputText(res.result);
         else setErrorMsg(res.error || "Invalid Hex string");
+        break;
+      }
+      case "enc-epoch": {
+        const res = convertTimestamp(input);
+        if (res.success) setOutputText(res.result);
+        else setErrorMsg(res.error || "Invalid Timestamp");
         break;
       }
 
@@ -234,6 +257,18 @@ export const StudioDrawer: React.FC<StudioDrawerProps> = ({
       case "text-stats": {
         const stats = countTextStats(input);
         setOutputText(`Characters:        ${stats.chars}\nWords:             ${stats.words}\nLines:             ${stats.lines}\nBytes:             ${stats.bytes}\nEstimated Tokens:  ~${stats.tokensEst}`);
+        break;
+      }
+      case "text-sql": {
+        const res = formatSql(input);
+        if (res.success) setOutputText(res.result);
+        else setErrorMsg(res.error || "Failed to format SQL");
+        break;
+      }
+      case "text-html-md": {
+        const res = htmlToMarkdown(input);
+        if (res.success) setOutputText(res.result);
+        else setErrorMsg(res.error || "Failed to convert HTML to Markdown");
         break;
       }
 
@@ -384,6 +419,18 @@ export const StudioDrawer: React.FC<StudioDrawerProps> = ({
             >
               JSON → YAML
             </button>
+            <button
+              onClick={() => runTransform("json-go", sourceText)}
+              className={`px-2 py-1 rounded text-[11px] font-mono border transition-colors ${activeAction === "json-go" ? "bg-sky-500/20 border-sky-500/40 text-sky-200" : "bg-zinc-900 border-zinc-800 text-zinc-300 hover:bg-zinc-800"}`}
+            >
+              Go Struct
+            </button>
+            <button
+              onClick={() => runTransform("json-rust", sourceText)}
+              className={`px-2 py-1 rounded text-[11px] font-mono border transition-colors ${activeAction === "json-rust" ? "bg-sky-500/20 border-sky-500/40 text-sky-200" : "bg-zinc-900 border-zinc-800 text-zinc-300 hover:bg-zinc-800"}`}
+            >
+              Rust Struct
+            </button>
           </>
         )}
 
@@ -447,6 +494,12 @@ export const StudioDrawer: React.FC<StudioDrawerProps> = ({
               className="px-2 py-1 rounded text-[11px] font-mono bg-zinc-900 border border-zinc-800 text-zinc-300 hover:bg-zinc-800"
             >
               Hex Decode
+            </button>
+            <button
+              onClick={() => runTransform("enc-epoch", sourceText)}
+              className="px-2 py-1 rounded text-[11px] font-mono bg-zinc-900 border border-zinc-800 text-zinc-300 hover:bg-zinc-800"
+            >
+              Unix Timestamp / Epoch
             </button>
           </>
         )}
@@ -530,6 +583,18 @@ export const StudioDrawer: React.FC<StudioDrawerProps> = ({
               className="px-2 py-1 rounded text-[11px] font-mono bg-zinc-900 border border-zinc-800 text-zinc-300 hover:bg-zinc-800"
             >
               Word & Token Stats
+            </button>
+            <button
+              onClick={() => runTransform("text-sql", sourceText)}
+              className="px-2 py-1 rounded text-[11px] font-mono bg-zinc-900 border border-zinc-800 text-zinc-300 hover:bg-zinc-800"
+            >
+              Format SQL
+            </button>
+            <button
+              onClick={() => runTransform("text-html-md", sourceText)}
+              className="px-2 py-1 rounded text-[11px] font-mono bg-zinc-900 border border-zinc-800 text-zinc-300 hover:bg-zinc-800"
+            >
+              HTML → Markdown
             </button>
           </>
         )}

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import type { ClipItem, DatabaseStats, CategoryFilter } from "../types/clip";
+import type { ClipItem, DatabaseStats, CategoryFilter, QueueItem } from "../types/clip";
 import { sounds } from "../lib/audio";
 
 // Safe wrapper for Tauri invoke
@@ -208,6 +208,26 @@ async function mockBrowserInvoke<T>(cmd: string, args: Record<string, unknown>):
     mockClips.unshift(newItem);
     return newItem as T;
   }
+  if (cmd === "export_encrypted_vault") {
+    const payload = JSON.stringify({
+      format: "clipstash-encrypted-vault",
+      version: 1,
+      salt: "bW9ja1NhbHQxMjM0NQ==",
+      nonce: "bW9ja05vbmNlMTI=",
+      ciphertext: "bW9ja0NpcGhlcnRleHQ=",
+      count: mockClips.length,
+    }, null, 2);
+    return payload as T;
+  }
+  if (cmd === "import_encrypted_vault") {
+    return 1 as T;
+  }
+  if (cmd === "is_bypass_sensitive_apps") {
+    return true as T;
+  }
+  if (cmd === "set_bypass_sensitive_apps") {
+    return undefined as T;
+  }
   return undefined as T;
 }
 
@@ -222,6 +242,8 @@ export function useClips() {
   const [selectedClip, setSelectedClip] = useState<ClipItem | null>(null);
   const [revealedSecrets, setRevealedSecrets] = useState<Record<string, string>>({});
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [pasteQueue, setPasteQueue] = useState<QueueItem[]>([]);
+  const [bypassSensitiveApps, setBypassSensitiveAppsState] = useState<boolean>(true);
 
   const fetchClips = useCallback(async () => {
     try {
@@ -260,6 +282,8 @@ export function useClips() {
     try {
       const p = await tauriInvoke<boolean>("is_paused");
       setIsPaused(p);
+      const bypass = await tauriInvoke<boolean>("is_bypass_sensitive_apps");
+      setBypassSensitiveAppsState(bypass);
     } catch {
       // ignore
     }
@@ -421,6 +445,71 @@ export function useClips() {
     }
   };
 
+  const addToQueue = async (clip: ClipItem) => {
+    try {
+      let content = clip.masked_content;
+      if (clip.is_secret) {
+        if (revealedSecrets[clip.id]) {
+          content = revealedSecrets[clip.id];
+        } else {
+          content = await tauriInvoke<string>("get_clip_content", { id: clip.id });
+        }
+      }
+      const newItem: QueueItem = {
+        id: clip.id + "-" + Date.now(),
+        preview: clip.preview_text.slice(0, 60),
+        text: content,
+        isSecret: clip.is_secret,
+      };
+      setPasteQueue((prev) => [...prev, newItem]);
+      sounds.playQueueStepSound();
+    } catch (err) {
+      console.error("Failed to add clip to queue:", err);
+    }
+  };
+
+  const removeFromQueue = (queueId: string) => {
+    setPasteQueue((prev) => prev.filter((item) => item.id !== queueId));
+  };
+
+  const popNextQueue = async (): Promise<QueueItem | null> => {
+    if (pasteQueue.length === 0) return null;
+    const [next, ...remaining] = pasteQueue;
+    try {
+      await tauriInvoke("copy_custom_text", { text: next.text });
+      sounds.playQueueStepSound();
+      setPasteQueue(remaining);
+      return next;
+    } catch (err) {
+      console.error("Failed to pop next queue item:", err);
+      return null;
+    }
+  };
+
+  const clearQueue = () => {
+    setPasteQueue([]);
+  };
+
+  const setBypassSensitiveApps = async (bypass: boolean) => {
+    try {
+      await tauriInvoke("set_bypass_sensitive_apps", { bypass });
+      setBypassSensitiveAppsState(bypass);
+    } catch (err) {
+      console.error("Failed to update sensitive apps bypass:", err);
+    }
+  };
+
+  const exportVault = async (passphrase: string): Promise<string> => {
+    return tauriInvoke<string>("export_encrypted_vault", { passphrase });
+  };
+
+  const importVault = async (passphrase: string, payload: string): Promise<number> => {
+    const count = await tauriInvoke<number>("import_encrypted_vault", { passphrase, payload });
+    fetchClips();
+    fetchStats();
+    return count;
+  };
+
   return {
     clips,
     searchQuery,
@@ -436,6 +525,15 @@ export function useClips() {
     setSelectedClip,
     revealedSecrets,
     copiedId,
+    pasteQueue,
+    bypassSensitiveApps,
+    setBypassSensitiveApps,
+    exportVault,
+    importVault,
+    addToQueue,
+    removeFromQueue,
+    popNextQueue,
+    clearQueue,
     copyClip,
     copyCustomText,
     togglePin,

@@ -12,6 +12,7 @@ import {
   Link as LinkIcon,
   Palette,
   FileText,
+  ListPlus,
 } from "lucide-react";
 import type { ClipItem } from "../types/clip";
 
@@ -28,6 +29,7 @@ interface ClipItemProps {
   onBurnSecret: () => void;
   onOpenStudio: () => void;
   onToggleReveal: () => void;
+  onAddToQueue?: () => void;
 }
 
 export const ClipItemView: React.FC<ClipItemProps> = ({
@@ -43,6 +45,7 @@ export const ClipItemView: React.FC<ClipItemProps> = ({
   onBurnSecret,
   onOpenStudio,
   onToggleReveal,
+  onAddToQueue,
 }) => {
   // Real-time remaining seconds for auto-purge countdown
   const [secondsRemaining, setSecondsRemaining] = useState<number | null>(null);
@@ -195,6 +198,20 @@ export const ClipItemView: React.FC<ClipItemProps> = ({
           >
             <Pin className={`w-3.5 h-3.5 ${clip.is_pinned ? "fill-indigo-400" : ""}`} />
           </button>
+
+          {/* Add to Paste Queue */}
+          {onAddToQueue && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onAddToQueue();
+              }}
+              title="Add to Sequential Paste Queue"
+              className="p-1 rounded hover:bg-zinc-800 text-zinc-400 hover:text-indigo-300 transition-colors"
+            >
+              <ListPlus className="w-3.5 h-3.5" />
+            </button>
+          )}
 
           {/* Developer Transformation Studio */}
           <button

@@ -179,6 +179,31 @@ pub fn scan_and_mask(content: &str) -> SecretScanResult {
     }
 }
 
+pub const SENSITIVE_PROCESSES: &[&str] = &[
+    "1password.exe",
+    "1password",
+    "bitwarden.exe",
+    "bitwarden",
+    "keepass.exe",
+    "keepassxc.exe",
+    "keepassxc",
+    "lastpass.exe",
+    "dashlane.exe",
+    "nordpass.exe",
+    "protonpass.exe",
+    "proton pass.exe",
+    "authy.exe",
+    "enpass.exe",
+    "roboform.exe",
+];
+
+pub fn is_sensitive_process(process_name: &str) -> bool {
+    let lower = process_name.to_lowercase();
+    SENSITIVE_PROCESSES
+        .iter()
+        .any(|&p| lower == p || lower.ends_with(p))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -1,4 +1,6 @@
-use crate::crypto::{decrypt_text, encrypt_text, hash_content};
+use crate::crypto::{
+    decrypt_text, decrypt_with_passphrase, encrypt_text, encrypt_with_passphrase, hash_content,
+};
 use crate::detector::scan_and_mask;
 use chrono::Utc;
 use rusqlite::{params, Connection};
@@ -521,6 +523,68 @@ impl Database {
         .map_err(|e| format!("Save setting error: {e}"))?;
         Ok(())
     }
+
+    pub fn export_vault(&self, passphrase: &str) -> Result<String, String> {
+        let conn = self.conn.lock().map_err(|e| e.to_string())?;
+        let mut stmt = conn
+            .prepare(
+                "SELECT content_encrypted, is_pinned, category_id, tags, created_at FROM clips ORDER BY created_at ASC",
+            )
+            .map_err(|e| e.to_string())?;
+
+        let rows = stmt
+            .query_map([], |row| {
+                let enc: String = row.get(0)?;
+                let is_pinned: bool = row.get::<_, i64>(1)? == 1;
+                let category_id: String = row.get(2)?;
+                let tags_json: String = row.get(3)?;
+                let created_at: i64 = row.get(4)?;
+                Ok((enc, is_pinned, category_id, tags_json, created_at))
+            })
+            .map_err(|e| e.to_string())?;
+
+        let mut export_records = Vec::new();
+        for r in rows {
+            let (enc, is_pinned, category_id, tags_json, created_at) =
+                r.map_err(|e| e.to_string())?;
+            let raw_content = decrypt_text(&enc)?;
+            let tags: Vec<String> = serde_json::from_str(&tags_json).unwrap_or_default();
+            export_records.push(VaultExportRecord {
+                raw_content,
+                is_pinned,
+                category_id,
+                tags,
+                created_at,
+            });
+        }
+
+        let serialized = serde_json::to_string(&export_records)
+            .map_err(|e| format!("Serialization error: {e}"))?;
+
+        encrypt_with_passphrase(&serialized, passphrase)
+    }
+
+    pub fn import_vault(&self, passphrase: &str, encrypted_payload: &str) -> Result<usize, String> {
+        let decrypted_json = decrypt_with_passphrase(encrypted_payload, passphrase)?;
+        let records: Vec<VaultExportRecord> = serde_json::from_str(&decrypted_json)
+            .map_err(|e| format!("Invalid vault records JSON: {e}"))?;
+
+        let count = records.len();
+        for rec in records {
+            let _ = self.save_clip(&rec.raw_content, Some(&rec.category_id), Some(rec.tags));
+        }
+
+        Ok(count)
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VaultExportRecord {
+    pub raw_content: String,
+    pub is_pinned: bool,
+    pub category_id: String,
+    pub tags: Vec<String>,
+    pub created_at: i64,
 }
 
 #[cfg(test)]
@@ -584,5 +648,23 @@ mod tests {
         let stats = db.get_stats().expect("get stats failed");
         assert_eq!(stats.total_clips, 0);
         assert_eq!(stats.total_purged, 1);
+    }
+
+    #[test]
+    fn test_vault_export_and_import() {
+        let db = Database::new_memory().expect("failed to init db");
+        db.save_clip("snippet-1", None, None).unwrap();
+        db.save_clip("snippet-2", None, None).unwrap();
+
+        let pass = "vault-export-passphrase-42";
+        let exported = db.export_vault(pass).expect("export failed");
+        assert!(exported.contains("clipstash-encrypted-vault"));
+
+        let db2 = Database::new_memory().expect("failed to init db2");
+        let imported = db2.import_vault(pass, &exported).expect("import failed");
+        assert_eq!(imported, 2);
+
+        let clips = db2.get_clips(None, None, false, false, 10, 0).unwrap();
+        assert_eq!(clips.len(), 2);
     }
 }

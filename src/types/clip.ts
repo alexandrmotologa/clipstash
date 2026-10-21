@@ -46,3 +46,10 @@ export interface TransformationAction {
   shortcut?: string;
   description: string;
 }
+
+export interface QueueItem {
+  id: string;
+  preview: string;
+  text: string;
+  isSecret: boolean;
+}

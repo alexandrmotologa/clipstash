@@ -89,6 +89,86 @@ pub fn decrypt_text(encrypted_b64: &str) -> Result<String, String> {
     String::from_utf8(decrypted_bytes).map_err(|e| format!("UTF-8 decode error: {e}"))
 }
 
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct EncryptedVaultContainer {
+    pub format: String,
+    pub version: u32,
+    pub salt: String,
+    pub nonce: String,
+    pub ciphertext: String,
+}
+
+pub fn derive_key_from_passphrase(passphrase: &str, salt: &[u8]) -> [u8; 32] {
+    let mut hasher = Sha256::new();
+    hasher.update(passphrase.as_bytes());
+    hasher.update(salt);
+    let mut key = hasher.finalize();
+    for _ in 1..5_000 {
+        let mut round_hasher = Sha256::new();
+        round_hasher.update(key);
+        round_hasher.update(salt);
+        key = round_hasher.finalize();
+    }
+    let mut out = [0u8; 32];
+    out.copy_from_slice(&key);
+    out
+}
+
+pub fn encrypt_with_passphrase(plain: &str, passphrase: &str) -> Result<String, String> {
+    let mut salt = [0u8; 16];
+    let mut nonce_bytes = [0u8; 12];
+    rand::thread_rng().fill_bytes(&mut salt);
+    rand::thread_rng().fill_bytes(&mut nonce_bytes);
+
+    let key = derive_key_from_passphrase(passphrase, &salt);
+    let cipher = Aes256Gcm::new((&key).into());
+    let nonce = Nonce::from_slice(&nonce_bytes);
+
+    let ciphertext = cipher
+        .encrypt(nonce, plain.as_bytes())
+        .map_err(|e| format!("Passphrase encryption failure: {e}"))?;
+
+    let container = EncryptedVaultContainer {
+        format: "clipstash-encrypted-vault".to_string(),
+        version: 1,
+        salt: BASE64.encode(salt),
+        nonce: BASE64.encode(nonce_bytes),
+        ciphertext: BASE64.encode(ciphertext),
+    };
+
+    serde_json::to_string_pretty(&container)
+        .map_err(|e| format!("Serialization error: {e}"))
+}
+
+pub fn decrypt_with_passphrase(container_json: &str, passphrase: &str) -> Result<String, String> {
+    let container: EncryptedVaultContainer = serde_json::from_str(container_json)
+        .map_err(|e| format!("Invalid vault container JSON: {e}"))?;
+
+    if container.format != "clipstash-encrypted-vault" {
+        return Err("Unrecognized vault backup format".to_string());
+    }
+
+    let salt = BASE64
+        .decode(&container.salt)
+        .map_err(|e| format!("Invalid salt: {e}"))?;
+    let nonce_bytes = BASE64
+        .decode(&container.nonce)
+        .map_err(|e| format!("Invalid nonce: {e}"))?;
+    let ciphertext = BASE64
+        .decode(&container.ciphertext)
+        .map_err(|e| format!("Invalid ciphertext: {e}"))?;
+
+    let key = derive_key_from_passphrase(passphrase, &salt);
+    let cipher = Aes256Gcm::new((&key).into());
+    let nonce = Nonce::from_slice(&nonce_bytes);
+
+    let decrypted = cipher
+        .decrypt(nonce, ciphertext.as_ref())
+        .map_err(|_| "Invalid passphrase or corrupted vault backup".to_string())?;
+
+    String::from_utf8(decrypted).map_err(|e| format!("UTF-8 decode error: {e}"))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -108,5 +188,22 @@ mod tests {
         assert_ne!(encrypted, secret);
         let decrypted = decrypt_text(&encrypted).expect("decryption failed");
         assert_eq!(decrypted, secret);
+    }
+
+    #[test]
+    fn test_passphrase_encryption_roundtrip() {
+        let payload = r#"{"name":"clipstash-test","clips":[{"id":"1","text":"test"}]}"#;
+        let pass = "my-secure-master-passphrase-2026";
+        let encrypted_container =
+            encrypt_with_passphrase(payload, pass).expect("passphrase encryption failed");
+        assert!(encrypted_container.contains("clipstash-encrypted-vault"));
+
+        let decrypted = decrypt_with_passphrase(&encrypted_container, pass)
+            .expect("passphrase decryption failed");
+        assert_eq!(decrypted, payload);
+
+        let wrong_pass = "wrong-password";
+        let failed = decrypt_with_passphrase(&encrypted_container, wrong_pass);
+        assert!(failed.is_err());
     }
 }

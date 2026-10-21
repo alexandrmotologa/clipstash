@@ -56,3 +56,37 @@ fn test_database_crud_and_fts() {
     let content = db.get_decrypted_content(&clip.id).expect("get content failed");
     assert_eq!(content, "let x = 42;");
 }
+
+#[test]
+fn test_vault_backup_encryption_export_import() {
+    let db = db::Database::new_memory().expect("in-memory db init failed");
+    db.save_clip("my-api-key-test-1", Some("secrets"), None).unwrap();
+    db.save_clip("https://example.com/webhook", Some("links"), None).unwrap();
+
+    let passphrase = "UserSecureVaultPassword#2026";
+    let exported = db.export_vault(passphrase).expect("export vault failed");
+    assert!(exported.contains("clipstash-encrypted-vault"));
+
+    // Attempt import into second db with matching passphrase
+    let db2 = db::Database::new_memory().expect("in-memory db2 init failed");
+    let count = db2.import_vault(passphrase, &exported).expect("import vault failed");
+    assert_eq!(count, 2);
+
+    let items = db2.get_clips(None, None, false, false, 10, 0).unwrap();
+    assert_eq!(items.len(), 2);
+
+    // Attempt import with wrong passphrase must fail
+    let db3 = db::Database::new_memory().expect("in-memory db3 init failed");
+    let failed = db3.import_vault("wrong-passphrase", &exported);
+    assert!(failed.is_err());
+}
+
+#[test]
+fn test_sensitive_process_detector() {
+    assert!(detector::is_sensitive_process("1Password.exe"));
+    assert!(detector::is_sensitive_process("bitwarden.exe"));
+    assert!(detector::is_sensitive_process("KeePassXC.exe"));
+    assert!(detector::is_sensitive_process("dashlane.exe"));
+    assert!(!detector::is_sensitive_process("notepad.exe"));
+    assert!(!detector::is_sensitive_process("code.exe"));
+}

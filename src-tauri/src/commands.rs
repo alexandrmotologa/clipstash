@@ -111,3 +111,31 @@ pub fn get_setting(
 pub fn set_setting(state: State<AppState>, key: String, value: String) -> Result<(), String> {
     state.db.set_setting(&key, &value)
 }
+
+#[tauri::command]
+pub fn export_encrypted_vault(state: State<AppState>, passphrase: String) -> Result<String, String> {
+    state.db.export_vault(&passphrase)
+}
+
+#[tauri::command]
+pub fn import_encrypted_vault(
+    state: State<AppState>,
+    passphrase: String,
+    payload: String,
+) -> Result<usize, String> {
+    state.db.import_vault(&passphrase, &payload)
+}
+
+#[tauri::command]
+pub fn is_bypass_sensitive_apps(state: State<AppState>) -> Result<bool, String> {
+    Ok(state.monitor.is_bypass_sensitive_apps())
+}
+
+#[tauri::command]
+pub fn set_bypass_sensitive_apps(state: State<AppState>, bypass: bool) -> Result<(), String> {
+    state.monitor.set_bypass_sensitive_apps(bypass);
+    let _ = state
+        .db
+        .set_setting("bypass_sensitive_apps", if bypass { "true" } else { "false" });
+    Ok(())
+}

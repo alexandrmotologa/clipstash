@@ -1,10 +1,13 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Header } from "./components/Header";
 import { CategoryTabs } from "./components/CategoryTabs";
 import { ClipList } from "./components/ClipList";
 import { StudioDrawer } from "./components/StudioDrawer";
 import { StatsModal } from "./components/StatsModal";
 import { SettingsModal } from "./components/SettingsModal";
+import { PasteQueueBar } from "./components/PasteQueueBar";
+import { CompactHud } from "./components/CompactHud";
+import { DiffModal } from "./components/DiffModal";
 import { useClips } from "./hooks/useClips";
 import type { ClipItem } from "./types/clip";
 
@@ -23,6 +26,15 @@ export function App() {
     setSelectedClip,
     revealedSecrets,
     copiedId,
+    pasteQueue,
+    bypassSensitiveApps,
+    setBypassSensitiveApps,
+    exportVault,
+    importVault,
+    addToQueue,
+    removeFromQueue,
+    popNextQueue,
+    clearQueue,
     copyClip,
     copyCustomText,
     togglePin,
@@ -36,6 +48,34 @@ export function App() {
 
   const [isStatsOpen, setIsStatsOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isDiffOpen, setIsDiffOpen] = useState(false);
+  const [isHudOpen, setIsHudOpen] = useState(false);
+
+  // Global shortcut listeners (Shift+Enter for queue pop, Tab for HUD toggle)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const activeEl = document.activeElement;
+      const isInput =
+        activeEl &&
+        (activeEl.tagName === "INPUT" || activeEl.tagName === "TEXTAREA");
+
+      // Shift+Enter pops next item from paste queue anywhere
+      if (e.shiftKey && e.key === "Enter" && pasteQueue.length > 0) {
+        e.preventDefault();
+        popNextQueue();
+        return;
+      }
+
+      // Tab toggles Quick HUD when not focusing an editable field
+      if (e.key === "Tab" && !isInput && !e.ctrlKey && !e.altKey) {
+        e.preventDefault();
+        setIsHudOpen((prev) => !prev);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [pasteQueue.length, popNextQueue]);
 
   const handleOpenStudio = (clip: ClipItem) => {
     setSelectedClip(clip);
@@ -58,6 +98,8 @@ export function App() {
         onTogglePause={togglePauseMonitoring}
         onOpenStats={() => setIsStatsOpen(true)}
         onOpenSettings={() => setIsSettingsOpen(true)}
+        onOpenDiff={() => setIsDiffOpen(true)}
+        onToggleHud={() => setIsHudOpen((v) => !v)}
         onClearHistory={() => clearHistory(true)}
         stats={stats}
       />
@@ -87,6 +129,15 @@ export function App() {
             onBurnSecret={burnSecretNow}
             onOpenStudio={handleOpenStudio}
             onToggleReveal={revealSecret}
+            onAddToQueue={addToQueue}
+          />
+
+          {/* Sequential Paste Queue Bar (Visible when queue has items) */}
+          <PasteQueueBar
+            queue={pasteQueue}
+            onPopNext={popNextQueue}
+            onRemoveItem={removeFromQueue}
+            onClearQueue={clearQueue}
           />
 
           {/* Keyboard Quick Bar Footer */}
@@ -103,6 +154,12 @@ export function App() {
                   Enter
                 </kbd>{" "}
                 Copy
+              </span>
+              <span>
+                <kbd className="px-1 py-0.5 rounded bg-zinc-800 border border-zinc-700 text-zinc-300">
+                  Q
+                </kbd>{" "}
+                Queue
               </span>
               <span>
                 <kbd className="px-1 py-0.5 rounded bg-zinc-800 border border-zinc-700 text-zinc-300">
@@ -133,6 +190,27 @@ export function App() {
         </div>
       </div>
 
+      {/* Quick HUD Mode (Raycast/Spotlight palette) */}
+      <CompactHud
+        isOpen={isHudOpen}
+        onClose={() => setIsHudOpen(false)}
+        clips={clips}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        onCopyClip={copyClip}
+        onTogglePin={togglePin}
+        copiedId={copiedId}
+      />
+
+      {/* Side-by-Side Diff Inspector Modal */}
+      <DiffModal
+        isOpen={isDiffOpen}
+        onClose={() => setIsDiffOpen(false)}
+        clips={clips}
+        revealedSecrets={revealedSecrets}
+        onCopyText={copyCustomText}
+      />
+
       {/* Telemetry Stats Modal */}
       <StatsModal
         isOpen={isStatsOpen}
@@ -140,11 +218,15 @@ export function App() {
         stats={stats}
       />
 
-      {/* Settings Modal */}
+      {/* Settings & Vault Security Modal */}
       <SettingsModal
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
         onClearHistory={clearHistory}
+        bypassSensitiveApps={bypassSensitiveApps}
+        onToggleBypassSensitiveApps={setBypassSensitiveApps}
+        onExportVault={exportVault}
+        onImportVault={importVault}
       />
     </div>
   );

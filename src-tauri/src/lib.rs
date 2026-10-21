@@ -46,6 +46,10 @@ pub fn run() {
             add_manual_clip,
             get_setting,
             set_setting,
+            export_encrypted_vault,
+            import_encrypted_vault,
+            is_bypass_sensitive_apps,
+            set_bypass_sensitive_apps,
         ])
         .setup(move |app| {
             // Start background clipboard listener thread

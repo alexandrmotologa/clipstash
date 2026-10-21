@@ -16,6 +16,7 @@ interface ClipListProps {
   onBurnSecret: (id: string) => void;
   onOpenStudio: (clip: ClipItem) => void;
   onToggleReveal: (id: string) => void;
+  onAddToQueue: (clip: ClipItem) => void;
 }
 
 export const ClipList: React.FC<ClipListProps> = ({
@@ -30,6 +31,7 @@ export const ClipList: React.FC<ClipListProps> = ({
   onBurnSecret,
   onOpenStudio,
   onToggleReveal,
+  onAddToQueue,
 }) => {
   const listRef = useRef<HTMLDivElement>(null);
 
@@ -63,6 +65,11 @@ export const ClipList: React.FC<ClipListProps> = ({
         if (clips[selectedIndex]) {
           e.preventDefault();
           onTogglePin(clips[selectedIndex].id);
+        }
+      } else if ((e.key === "q" || e.key === "Q") && !isInput && !e.ctrlKey && !e.metaKey) {
+        if (clips[selectedIndex]) {
+          e.preventDefault();
+          onAddToQueue(clips[selectedIndex]);
         }
       } else if (e.key === "Delete" && !isInput) {
         if (clips[selectedIndex]) {
@@ -111,6 +118,7 @@ export const ClipList: React.FC<ClipListProps> = ({
           onBurnSecret={() => onBurnSecret(clip.id)}
           onOpenStudio={() => onOpenStudio(clip)}
           onToggleReveal={() => onToggleReveal(clip.id)}
+          onAddToQueue={() => onAddToQueue(clip)}
         />
       ))}
     </div>
